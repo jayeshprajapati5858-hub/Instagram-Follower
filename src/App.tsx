@@ -159,6 +159,7 @@ function Features() {
 
 function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: string) => void }) {
   const [username, setUsername] = useState("");
+  const [error, setError] = useState(false);
 
   const plans = [
     { followers: "500+", price: "49", original: "99", popular: false, link: "https://rzp.io/rzp/YPH7OqC" },
@@ -187,11 +188,16 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
                 type="text"
                 id="username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="block w-full pl-10 pr-4 py-4 bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all text-lg group-hover:border-pink-500/50"
+                onChange={(e) => { setUsername(e.target.value); setError(false); }}
+                className={`block w-full pl-10 pr-4 py-4 bg-slate-900/80 backdrop-blur-sm border ${error ? 'border-red-500' : 'border-slate-700/50 group-hover:border-pink-500/50'} rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all text-lg`}
                 placeholder="your_username"
               />
             </div>
+            {error && (
+              <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-red-400 text-sm mt-2 text-center font-medium">
+                Please enter your Instagram username first to proceed.
+              </motion.p>
+            )}
 
             <motion.div 
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -281,7 +287,11 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
               <button 
                 onClick={async () => {
                   if (!username) {
-                    alert("Please enter your Instagram username first.");
+                    setError(true);
+                    
+                    // Scroll to the username input
+                    document.getElementById('username')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    document.getElementById('username')?.focus();
                     return;
                   }
                   
