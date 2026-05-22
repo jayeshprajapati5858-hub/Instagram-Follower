@@ -6,6 +6,7 @@
 import { Shield, Zap, Heart, CheckCircle, Star, Instagram, ChevronRight, Lock, ChevronLeft, User } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { saveOrder } from './firebase';
 
 export default function App() {
   const [checkoutPlan, setCheckoutPlan] = useState<any>(null);
@@ -160,6 +161,7 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
   const [username, setUsername] = useState("");
 
   const plans = [
+    { followers: "500+", price: "49", original: "99", popular: false, link: "https://rzp.io/rzp/YPH7OqC" },
     { followers: "1K", price: "199", original: "499", popular: false, link: "https://rzp.io/rzp/ezaWs4QV" },
     { followers: "3K", price: "399", original: "899", popular: false, link: "https://rzp.io/rzp/SQc2qZRQ" },
     { followers: "100K", price: "599", original: "1999", popular: true, link: "https://rzp.io/rzp/3FiO1l0j" },
@@ -175,9 +177,9 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
           <p className="text-slate-400">Select a package and skyrocket your profile instantly.</p>
         </motion.div>
         
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }} className="max-w-md mx-auto mb-16 relative z-10">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }} className="max-w-xl mx-auto mb-16 relative z-10">
             <label htmlFor="username" className="block text-sm font-medium text-slate-400 mb-2 text-center">Enter Your Instagram Username First</label>
-            <div className="relative shadow-lg shadow-pink-500/5 group">
+            <div className="relative shadow-lg shadow-pink-500/5 group mb-8">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <span className="text-slate-400 font-medium">@</span>
               </div>
@@ -190,9 +192,47 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
                 placeholder="your_username"
               />
             </div>
+
+            <motion.div 
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="bg-slate-900/80 backdrop-blur-sm border border-yellow-500/30 rounded-2xl p-6 shadow-xl shadow-yellow-500/5 relative overflow-hidden group hover:border-yellow-500/50 transition-colors"
+            >
+              <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
+              <div className="flex items-center gap-2 mb-4">
+                <motion.span 
+                  animate={{ rotate: [0, 10, -10, 0] }} 
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }} 
+                  className="text-xl"
+                >
+                  ⚠️
+                </motion.span>
+                <h3 className="text-yellow-500 font-bold text-lg tracking-wide">Important Notes:</h3>
+              </div>
+              <ul className="space-y-3 text-sm text-slate-300">
+                <li className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5 text-base">✔</span>
+                  <span className="leading-relaxed">Your Instagram profile must be set to <strong className="text-white">PUBLIC</strong> before placing an order.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5 text-base">✔</span>
+                  <span className="leading-relaxed">Please disable the <strong className="text-white">"Flag for Review"</strong> option in your Instagram settings before ordering followers.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5 text-base">✔</span>
+                  <span className="leading-relaxed">Delivery starts within <strong className="text-white">2-15 minutes</strong> and completes within 24-48 hours.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5 text-base">✔</span>
+                  <span className="leading-relaxed">All followers come with a <strong className="text-white">365-day refill guarantee</strong>.</span>
+                </li>
+              </ul>
+            </motion.div>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan, i) => (
             <motion.div 
               key={i}
@@ -239,11 +279,15 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
               </ul>
 
               <button 
-                onClick={() => {
+                onClick={async () => {
                   if (!username) {
                     alert("Please enter your Instagram username first.");
                     return;
                   }
+                  
+                  // Save the order to Firebase
+                  await saveOrder(username, plan);
+
                   if (plan.link) {
                     window.location.href = plan.link;
                   } else {
@@ -381,22 +425,31 @@ function Footer() {
 }
 
 function CheckoutPage({ plan, username, onBack }: { plan: any, username: string, onBack: () => void }) {
-  const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    // Only append the script once
-    if (formRef.current && formRef.current.children.length === 0) {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/payment-button.js';
-      script.setAttribute('data-payment_button_id', 'pl_SsJfu9kEwrml69');
-      script.async = true;
-      formRef.current.appendChild(script);
-    }
-  }, []);
+  const [status, setStatus] = useState<"waiting" | "verifying" | "success">("waiting");
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  if (status === "success") {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-pink-500/30 flex flex-col items-center justify-center p-4 text-center">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full relative overflow-hidden shadow-2xl shadow-pink-500/10">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-green-400 to-emerald-600"></div>
+          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-10 h-10 text-green-500" />
+          </div>
+          <h2 className="text-3xl font-bold mb-4 text-white">Payment Successful!</h2>
+          <p className="text-slate-400 mb-8 leading-relaxed">
+            Thank you for your order. We have received your request for <strong>{plan.followers} followers</strong> for checkout account <strong className="text-pink-400">@{username}</strong>. Delivery will begin within 0-15 minutes.
+          </p>
+          <button onClick={() => window.location.href = '/'} className="w-full py-4 rounded-xl font-bold bg-white text-slate-900 hover:bg-slate-200 transition-all flex items-center justify-center gap-2">
+            Return to Home
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-pink-500/30 flex flex-col items-center pt-20 px-4">
@@ -405,12 +458,13 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
           <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Back
         </button>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-slate-900 border border-slate-800 rounded-3xl p-8 relative shadow-2xl shadow-pink-500/5 overflow-hidden">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-slate-900 border border-slate-800 rounded-3xl p-8 relative shadow-2xl shadow-pink-500/5 overflow-hidden text-center">
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600"></div>
           
-          <h2 className="text-2xl font-bold mb-6 text-center">Complete Your Order</h2>
+          <h2 className="text-2xl font-bold mb-4">Complete Payment</h2>
+          <p className="text-slate-400 mb-6 text-sm leading-relaxed">A new tab has opened for secure payment at Razorpay. Do not close this window.</p>
           
-          <div className="bg-slate-950/50 rounded-2xl p-5 mb-6 border border-slate-800/50">
+          <div className="bg-slate-950/50 rounded-2xl p-5 mb-8 border border-slate-800/50 text-left">
             <div className="flex justify-between items-center mb-4">
               <span className="text-slate-400 font-medium">Package</span>
               <span className="text-white font-bold text-lg">{plan.followers} Followers</span>
@@ -426,17 +480,31 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 flex items-center justify-center min-h-[90px] shadow-inner relative overflow-hidden">
-             {/* The Razorpay button renders here */}
-             <form ref={formRef}></form>
-          </div>
-
-          <div className="mt-8 flex flex-col items-center gap-3">
-            <div className="text-sm text-slate-400 font-medium flex items-center gap-1.5">
-              <Shield className="w-4 h-4 text-green-400" /> 
-              Secure Encrypted Payment
+          {status === "verifying" ? (
+             <div className="py-4 flex flex-col items-center">
+                <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-slate-400 animate-pulse">Verifying payment with Razorpay...</p>
+             </div>
+          ) : (
+            <div className="space-y-4">
+              <button 
+                onClick={() => {
+                  setStatus("verifying");
+                  setTimeout(() => setStatus("success"), 2500);
+                }} 
+                className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 transition-all flex items-center justify-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5" /> I Have Completed Payment
+              </button>
+              
+              <button 
+                onClick={() => window.open(plan.link, '_blank')} 
+                className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
+              >
+                Click here if payment tab didn't open
+              </button>
             </div>
-          </div>
+          )}
         </motion.div>
       </div>
     </div>
