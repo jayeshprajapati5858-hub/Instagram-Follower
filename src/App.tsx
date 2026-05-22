@@ -7,14 +7,15 @@ import { Shield, Zap, Heart, CheckCircle, Star, Instagram, ChevronRight, Lock, C
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import QRCode from 'react-qr-code';
-import { saveOrder } from './firebase';
+import { saveOrder, updateOrderWithRRN } from './firebase';
 
 export default function App() {
   const [checkoutPlan, setCheckoutPlan] = useState<any>(null);
   const [checkoutUsername, setCheckoutUsername] = useState("");
+  const [checkoutOrderId, setCheckoutOrderId] = useState<string | null>(null);
 
   if (checkoutPlan) {
-    return <CheckoutPage plan={checkoutPlan} username={checkoutUsername} onBack={() => setCheckoutPlan(null)} />;
+    return <CheckoutPage plan={checkoutPlan} username={checkoutUsername} orderId={checkoutOrderId} onBack={() => { setCheckoutPlan(null); setCheckoutOrderId(null); }} />;
   }
 
   return (
@@ -23,9 +24,10 @@ export default function App() {
       <main>
         <Hero />
         <Features />
-        <PricingSection onCheckout={(plan, user) => {
+        <PricingSection onCheckout={(plan, user, orderId) => {
           setCheckoutPlan(plan);
           setCheckoutUsername(user);
+          setCheckoutOrderId(orderId);
         }} />
         <Testimonials />
         <FAQ />
@@ -158,9 +160,10 @@ function Features() {
   );
 }
 
-function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: string) => void }) {
+function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: string, orderId: string) => void }) {
   const [username, setUsername] = useState("");
   const [error, setError] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const plans = [
     { followers: "50", price: "1", original: "10", popular: false, link: "https://rzp.io/rzp/t0bMzCw1" },
@@ -287,7 +290,7 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
               </ul>
 
               <button 
-                onClick={() => {
+                onClick={async () => {
                   if (!username) {
                     setError(true);
                     
@@ -297,19 +300,24 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
                     return;
                   }
                   
-                  // Save the order to Firebase (background)
-                  saveOrder(username, plan);
+                  setIsProcessing(true);
                   
                   // Open payment link synchronously on click to avoid popup blockers
+                  let tempTab: Window | null = null;
                   if (plan.link && plan.followers !== "1K") {
-                    window.open(plan.link, '_blank');
+                    tempTab = window.open(plan.link, '_blank');
                   }
                   
-                  onCheckout(plan, username);
+                  // Save the order to Firebase
+                  const orderId = await saveOrder(username, plan);
+                  
+                  setIsProcessing(false);
+                  onCheckout(plan, username, orderId || "");
                 }}
-                className={`w-full py-4 rounded-xl font-bold text-base transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 ${plan.popular ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40' : 'bg-white text-slate-900 hover:bg-slate-200 shadow-lg shadow-white/10'}`}>
+                disabled={isProcessing}
+                className={`w-full py-4 rounded-xl font-bold text-base transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-75 disabled:scale-100 disabled:cursor-not-allowed ${plan.popular ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40' : 'bg-white text-slate-900 hover:bg-slate-200 shadow-lg shadow-white/10'}`}>
                 <Lock className="w-4 h-4" />
-                Buy Now
+                {isProcessing ? "Processing..." : "Buy Now"}
               </button>
 
               <div className="mt-6 flex flex-col items-center gap-3">
@@ -437,8 +445,10 @@ function Footer() {
   );
 }
 
-function CheckoutPage({ plan, username, onBack }: { plan: any, username: string, onBack: () => void }) {
+function CheckoutPage({ plan, username, orderId, onBack }: { plan: any, username: string, orderId: string | null, onBack: () => void }) {
   const [status, setStatus] = useState<"waiting" | "verifying" | "success">("waiting");
+  const [rrn, setRrn] = useState("");
+  const [rrnError, setRrnError] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -512,16 +522,35 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
           {status === "verifying" ? (
              <div className="py-4 flex flex-col items-center">
                 <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-slate-400 animate-pulse">Verifying payment with Razorpay...</p>
+                <p className="text-slate-400 animate-pulse">Verifying payment mapping...</p>
              </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5 flex flex-col">
+              <div className="text-left w-full">
+                <label htmlFor="rrn" className="block text-sm font-medium text-slate-300 mb-1">Transaction ID / UTR / RRN <span className="text-pink-500">*</span></label>
+                <input 
+                  type="text" 
+                  id="rrn"
+                  value={rrn}
+                  onChange={(e) => { setRrn(e.target.value); setRrnError(false); }}
+                  placeholder="e.g. 123456789012" 
+                  className={`block w-full p-3 bg-slate-900/80 border ${rrnError ? 'border-red-500' : 'border-slate-700'} rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all`} 
+                />
+                {rrnError && <p className="text-red-400 text-xs mt-1">Please enter your transaction reference number to verify payment.</p>}
+              </div>
               <button 
-                onClick={() => {
+                onClick={async () => {
+                  if (!rrn.trim()) {
+                    setRrnError(true);
+                    return;
+                  }
                   setStatus("verifying");
-                  setTimeout(() => setStatus("success"), 2500);
+                  if (orderId) {
+                    await updateOrderWithRRN(orderId, rrn);
+                  }
+                  setTimeout(() => setStatus("success"), 1500);
                 }} 
-                className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 transition-all flex items-center justify-center gap-2 mt-4"
               >
                 <CheckCircle className="w-5 h-5" /> I Have Completed Payment
               </button>

@@ -18,15 +18,34 @@ export const db = getFirestore(app);
 export const saveOrder = async (username: string, plan: any) => {
   try {
     const ordersRef = collection(db, "orders");
-    await addDoc(ordersRef, {
+    const docRef = await addDoc(ordersRef, {
       username: username,
       planFollowers: plan.followers,
       planPrice: plan.price,
       status: "pending",
       createdAt: serverTimestamp()
     });
-    console.log("Order saved successfully");
+    console.log("Order saved successfully with ID: ", docRef.id);
+    return docRef.id;
   } catch (error) {
     console.error("Error saving order: ", error);
+    return null;
+  }
+};
+
+import { doc, updateDoc } from "firebase/firestore";
+
+export const updateOrderWithRRN = async (orderId: string, rrn: string) => {
+  try {
+    const orderRef = doc(db, "orders", orderId);
+    await updateDoc(orderRef, {
+      rrn: rrn,
+      status: "verification_pending"
+    });
+    console.log("RRN updated successfully");
+    return true;
+  } catch (error) {
+    console.error("Error updating RRN: ", error);
+    return false;
   }
 };
