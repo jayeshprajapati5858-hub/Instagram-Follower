@@ -166,8 +166,6 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
   const [isProcessing, setIsProcessing] = useState(false);
 
   const plans = [
-    { followers: "50", price: "1", original: "10", popular: false, link: "https://rzp.io/rzp/t0bMzCw1" },
-    { followers: "500+", price: "49", original: "99", popular: false, link: "https://rzp.io/rzp/YPH7OqC" },
     { followers: "1K", price: "199", original: "499", popular: false, link: "https://rzp.io/rzp/ezaWs4QV" },
     { followers: "3K", price: "399", original: "899", popular: false, link: "https://rzp.io/rzp/SQc2qZRQ" },
     { followers: "100K", price: "599", original: "1999", popular: true, link: "https://rzp.io/rzp/3FiO1l0j" },
@@ -304,7 +302,7 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
                   
                   // Open payment link synchronously on click to avoid popup blockers
                   let tempTab: Window | null = null;
-                  if (plan.link && plan.followers !== "1K") {
+                  if (plan.link && !["1K", "3K", "100K"].includes(plan.followers)) {
                     tempTab = window.open(plan.link, '_blank');
                   }
                   
@@ -486,7 +484,7 @@ function CheckoutPage({ plan, username, orderId, onBack }: { plan: any, username
           
           <h2 className="text-2xl font-bold mb-4">Complete Payment</h2>
           
-          {plan.followers === "1K" ? (
+          {["1K", "3K", "100K"].includes(plan.followers) ? (
              <div className="bg-white p-6 rounded-2xl mb-8 mx-auto w-fit flex flex-col items-center">
                <div className="flex gap-4 justify-center items-center w-full mb-4 px-2">
                  <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI" className="h-5" />
@@ -498,6 +496,8 @@ function CheckoutPage({ plan, username, orderId, onBack }: { plan: any, username
                  <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-4" />
                  <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_%28standalone%29.svg" alt="Paytm" className="h-[10px]" />
                </div>
+               <div className="mt-6 text-center text-[#0b1b42] font-semibold text-2xl tracking-tight">Myshopsmyhome</div>
+               <div className="text-center text-[#0b1b42] font-medium text-lg mt-1">{plan.followers}</div>
              </div>
           ) : (
              <p className="text-slate-400 mb-6 text-sm leading-relaxed">A new tab has opened for secure payment at Razorpay. Do not close this window.</p>
@@ -555,7 +555,7 @@ function CheckoutPage({ plan, username, orderId, onBack }: { plan: any, username
                 <CheckCircle className="w-5 h-5" /> I Have Completed Payment
               </button>
               
-              {plan.followers !== "1K" && (
+              {!["1K", "3K", "100K"].includes(plan.followers) && (
                 <button 
                   onClick={() => window.open(plan.link, '_blank')} 
                   className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
