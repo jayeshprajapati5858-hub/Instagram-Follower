@@ -1,0 +1,8 @@
+{
+  "name": "FollowKing",
+  "description": "Instagram follower growth service layout offering 100K followers for ₹250.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
