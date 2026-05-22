@@ -6,6 +6,7 @@
 import { Shield, Zap, Heart, CheckCircle, Star, Instagram, ChevronRight, Lock, ChevronLeft, User } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
+import QRCode from 'react-qr-code';
 import { saveOrder } from './firebase';
 
 export default function App() {
@@ -297,12 +298,7 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
                   
                   // Save the order to Firebase
                   await saveOrder(username, plan);
-
-                  if (plan.link) {
-                    window.location.href = plan.link;
-                  } else {
-                    onCheckout(plan, username);
-                  }
+                  onCheckout(plan, username);
                 }}
                 className={`w-full py-4 rounded-xl font-bold text-base transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 ${plan.popular ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40' : 'bg-white text-slate-900 hover:bg-slate-200 shadow-lg shadow-white/10'}`}>
                 <Lock className="w-4 h-4" />
@@ -439,7 +435,11 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    // Automatically open the payment link in a new tab when the checkout page opens
+    if (plan.link && plan.followers !== "1K") {
+      window.open(plan.link, '_blank');
+    }
+  }, [plan.link, plan.followers]);
 
   if (status === "success") {
     return (
@@ -472,8 +472,24 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600"></div>
           
           <h2 className="text-2xl font-bold mb-4">Complete Payment</h2>
-          <p className="text-slate-400 mb-6 text-sm leading-relaxed">A new tab has opened for secure payment at Razorpay. Do not close this window.</p>
           
+          {plan.followers === "1K" ? (
+             <div className="bg-white p-6 rounded-2xl mb-8 mx-auto w-fit flex flex-col items-center">
+               <div className="flex gap-4 justify-center items-center w-full mb-4 px-2">
+                 <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI" className="h-5" />
+               </div>
+               <QRCode value={`upi://pay?pa=Myshopsmyhome@rzp&pn=Myshopsmyhome&am=${plan.price}&cu=INR`} size={180} />
+               <p className="text-slate-900 text-xs font-bold tracking-wider mt-4 text-center">SCAN & PAY WITH ANY UPI APP</p>
+               <div className="flex gap-3 justify-center mt-4 items-center grayscale">
+                 <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" alt="GPay" className="h-4" />
+                 <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-4" />
+                 <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_%28standalone%29.svg" alt="Paytm" className="h-[10px]" />
+               </div>
+             </div>
+          ) : (
+             <p className="text-slate-400 mb-6 text-sm leading-relaxed">A new tab has opened for secure payment at Razorpay. Do not close this window.</p>
+          )}
+
           <div className="bg-slate-950/50 rounded-2xl p-5 mb-8 border border-slate-800/50 text-left">
             <div className="flex justify-between items-center mb-4">
               <span className="text-slate-400 font-medium">Package</span>
@@ -507,12 +523,14 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
                 <CheckCircle className="w-5 h-5" /> I Have Completed Payment
               </button>
               
-              <button 
-                onClick={() => window.open(plan.link, '_blank')} 
-                className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
-              >
-                Click here if payment tab didn't open
-              </button>
+              {plan.followers !== "1K" && (
+                <button 
+                  onClick={() => window.open(plan.link, '_blank')} 
+                  className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
+                >
+                  Click here if payment tab didn't open
+                </button>
+              )}
             </div>
           )}
         </motion.div>
