@@ -163,6 +163,7 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
   const [error, setError] = useState(false);
 
   const plans = [
+    { followers: "50", price: "1", original: "10", popular: false, link: "https://rzp.io/rzp/t0bMzCw1" },
     { followers: "500+", price: "49", original: "99", popular: false, link: "https://rzp.io/rzp/YPH7OqC" },
     { followers: "1K", price: "199", original: "499", popular: false, link: "https://rzp.io/rzp/ezaWs4QV" },
     { followers: "3K", price: "399", original: "899", popular: false, link: "https://rzp.io/rzp/SQc2qZRQ" },
