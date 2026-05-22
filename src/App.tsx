@@ -286,7 +286,7 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
               </ul>
 
               <button 
-                onClick={async () => {
+                onClick={() => {
                   if (!username) {
                     setError(true);
                     
@@ -296,8 +296,14 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
                     return;
                   }
                   
-                  // Save the order to Firebase
-                  await saveOrder(username, plan);
+                  // Save the order to Firebase (background)
+                  saveOrder(username, plan);
+                  
+                  // Open payment link synchronously on click to avoid popup blockers
+                  if (plan.link && plan.followers !== "1K") {
+                    window.open(plan.link, '_blank');
+                  }
+                  
                   onCheckout(plan, username);
                 }}
                 className={`w-full py-4 rounded-xl font-bold text-base transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 ${plan.popular ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40' : 'bg-white text-slate-900 hover:bg-slate-200 shadow-lg shadow-white/10'}`}>
@@ -435,11 +441,7 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    // Automatically open the payment link in a new tab when the checkout page opens
-    if (plan.link && plan.followers !== "1K") {
-      window.open(plan.link, '_blank');
-    }
-  }, [plan.link, plan.followers]);
+  }, []);
 
   if (status === "success") {
     return (
