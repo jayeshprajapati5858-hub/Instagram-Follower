@@ -15,37 +15,40 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
-export const saveOrder = async (username: string, plan: any) => {
+export const createSuccessfulOrder = async (username: string, plan: any, paymentId: string) => {
   try {
     const ordersRef = collection(db, "orders");
     const docRef = await addDoc(ordersRef, {
       username: username,
       planFollowers: plan.followers,
       planPrice: plan.price,
-      status: "pending",
+      paymentId: paymentId,
+      status: "success",
       createdAt: serverTimestamp()
     });
     console.log("Order saved successfully with ID: ", docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error("Error saving order: ", error);
+    console.error("Error saving payment complete order: ", error);
     return null;
   }
 };
 
-import { doc, updateDoc } from "firebase/firestore";
-
-export const updateOrderWithRRN = async (orderId: string, rrn: string) => {
+export const createQRVerificationOrder = async (username: string, plan: any, rrn: string) => {
   try {
-    const orderRef = doc(db, "orders", orderId);
-    await updateDoc(orderRef, {
+    const ordersRef = collection(db, "orders");
+    const docRef = await addDoc(ordersRef, {
+      username: username,
+      planFollowers: plan.followers,
+      planPrice: plan.price,
       rrn: rrn,
-      status: "verification_pending"
+      status: "verification_pending",
+      createdAt: serverTimestamp()
     });
-    console.log("RRN updated successfully");
-    return true;
+    console.log("Order saved successfully with ID: ", docRef.id);
+    return docRef.id;
   } catch (error) {
-    console.error("Error updating RRN: ", error);
-    return false;
+    console.error("Error saving QR order: ", error);
+    return null;
   }
 };

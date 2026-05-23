@@ -7,15 +7,14 @@ import { Shield, Zap, Heart, CheckCircle, Star, Instagram, ChevronRight, Lock, C
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import QRCode from 'react-qr-code';
-import { saveOrder, updateOrderWithRRN } from './firebase';
+import { createSuccessfulOrder, createQRVerificationOrder } from './firebase';
 
 export default function App() {
   const [checkoutPlan, setCheckoutPlan] = useState<any>(null);
   const [checkoutUsername, setCheckoutUsername] = useState("");
-  const [checkoutOrderId, setCheckoutOrderId] = useState<string | null>(null);
 
   if (checkoutPlan) {
-    return <CheckoutPage plan={checkoutPlan} username={checkoutUsername} orderId={checkoutOrderId} onBack={() => { setCheckoutPlan(null); setCheckoutOrderId(null); }} />;
+    return <CheckoutPage plan={checkoutPlan} username={checkoutUsername} onBack={() => { setCheckoutPlan(null); }} />;
   }
 
   return (
@@ -24,10 +23,9 @@ export default function App() {
       <main>
         <Hero />
         <Features />
-        <PricingSection onCheckout={(plan, user, orderId) => {
+        <PricingSection onCheckout={(plan, user) => {
           setCheckoutPlan(plan);
           setCheckoutUsername(user);
-          setCheckoutOrderId(orderId);
         }} />
         <Testimonials />
         <FAQ />
@@ -160,10 +158,10 @@ function Features() {
   );
 }
 
-function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: string, orderId: string) => void }) {
+function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: string) => void }) {
   const [username, setUsername] = useState("");
   const [error, setError] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingPlan, setProcessingPlan] = useState<string | null>(null);
 
   const plans = [
     { followers: "1K", price: "199", original: "499", popular: false, link: "https://rzp.io/rzp/ezaWs4QV" },
@@ -298,24 +296,19 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
                     return;
                   }
                   
-                  setIsProcessing(true);
+                  setProcessingPlan(plan.followers);
                   
-                  // Open payment link synchronously on click to avoid popup blockers
-                  let tempTab: Window | null = null;
-                  if (plan.link && !["1K", "3K", "100K"].includes(plan.followers)) {
-                    tempTab = window.open(plan.link, '_blank');
-                  }
-                  
-                  // Save the order to Firebase
-                  const orderId = await saveOrder(username, plan);
-                  
-                  setIsProcessing(false);
-                  onCheckout(plan, username, orderId || "");
+                  // Proceed to checkout without saving immediately
+                  // The save to Firebase will happen ONLY after payment goes through on the next screen
+                  setTimeout(() => {
+                    setProcessingPlan(null);
+                    onCheckout(plan, username);
+                  }, 400);
                 }}
-                disabled={isProcessing}
+                disabled={processingPlan === plan.followers}
                 className={`w-full py-4 rounded-xl font-bold text-base transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-75 disabled:scale-100 disabled:cursor-not-allowed ${plan.popular ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40' : 'bg-white text-slate-900 hover:bg-slate-200 shadow-lg shadow-white/10'}`}>
                 <Lock className="w-4 h-4" />
-                {isProcessing ? "Processing..." : "Buy Now"}
+                {processingPlan === plan.followers ? "Processing..." : "Buy Now"}
               </button>
 
               <div className="mt-6 flex flex-col items-center gap-3">
@@ -443,7 +436,7 @@ function Footer() {
   );
 }
 
-function CheckoutPage({ plan, username, orderId, onBack }: { plan: any, username: string, orderId: string | null, onBack: () => void }) {
+function CheckoutPage({ plan, username, onBack }: { plan: any, username: string, onBack: () => void }) {
   const [status, setStatus] = useState<"waiting" | "verifying" | "success">("waiting");
   const [rrn, setRrn] = useState("");
   const [rrnError, setRrnError] = useState(false);
@@ -500,7 +493,50 @@ function CheckoutPage({ plan, username, orderId, onBack }: { plan: any, username
                <div className="text-center text-[#0b1b42] font-medium text-lg mt-1">{plan.followers}</div>
              </div>
           ) : (
-             <p className="text-slate-400 mb-6 text-sm leading-relaxed">A new tab has opened for secure payment at Razorpay. Do not close this window.</p>
+             <div className="flex flex-col items-center mb-6">
+                <p className="text-slate-400 mb-4 text-sm leading-relaxed">Secure payment powered by Razorpay.</p>
+                <button 
+                  onClick={async () => {
+                     const res = await new Promise((resolve) => {
+                        const script = document.createElement("script");
+                        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+                        script.onload = () => resolve(true);
+                        script.onerror = () => resolve(false);
+                        document.body.appendChild(script);
+                     });
+                     if (!res) {
+                        alert("Failed to load Razorpay payment gateway.");
+                        return;
+                     }
+                     const options = {
+                        key: "rzp_live_SQyi6kKYHeopKY",
+                        amount: Math.round(parseFloat(plan.price) * 100),
+                        currency: "INR",
+                        name: "Myshopsmyhome",
+                        description: `Grow ${plan.followers} Followers`,
+                        handler: async function (response: any) {
+                           // Save to Firebase as a successful order
+                           await createSuccessfulOrder(username, plan, response.razorpay_payment_id);
+                           
+                           // Update the local input and status automatically
+                           setRrn(response.razorpay_payment_id);
+                           setStatus("success");
+                        },
+                        prefill: {
+                           name: username
+                        },
+                        theme: {
+                           color: "#ec4899"
+                        }
+                     };
+                     const rzp = new (window as any).Razorpay(options);
+                     rzp.open();
+                  }}
+                  className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
+                >
+                  Pay ₹{plan.price} Now
+                </button>
+             </div>
           )}
 
           <div className="bg-slate-950/50 rounded-2xl p-5 mb-8 border border-slate-800/50 text-left">
@@ -545,24 +581,15 @@ function CheckoutPage({ plan, username, orderId, onBack }: { plan: any, username
                     return;
                   }
                   setStatus("verifying");
-                  if (orderId) {
-                    await updateOrderWithRRN(orderId, rrn);
-                  }
-                  setTimeout(() => setStatus("success"), 1500);
+                  await createQRVerificationOrder(username, plan, rrn);
+                  setTimeout(() => setStatus("success"), 1000);
                 }} 
                 className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 transition-all flex items-center justify-center gap-2 mt-4"
               >
                 <CheckCircle className="w-5 h-5" /> I Have Completed Payment
               </button>
               
-              {!["1K", "3K", "100K"].includes(plan.followers) && (
-                <button 
-                  onClick={() => window.open(plan.link, '_blank')} 
-                  className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
-                >
-                  Click here if payment tab didn't open
-                </button>
-              )}
+              {/* Fallback button removed since Razorpay popup natively loads now */}
             </div>
           )}
         </motion.div>
