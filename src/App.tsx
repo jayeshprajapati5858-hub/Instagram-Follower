@@ -510,7 +510,7 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
                     return;
                  }
                  const options = {
-                    key: "rzp_live_SQyi6kKYHeopKY",
+                    key: "rzp_live_StVCkuCsWFpI6w",
                     amount: Math.round(parseFloat(plan.price) * 100),
                     currency: "INR",
                     name: "Myshopsmyhome",
