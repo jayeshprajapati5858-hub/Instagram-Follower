@@ -164,6 +164,7 @@ function PricingSection({ onCheckout }: { onCheckout: (plan: any, username: stri
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
 
   const plans = [
+    { followers: "Test (₹1)", price: "1", original: "10", popular: false, link: "" },
     { followers: "1K", price: "199", original: "499", popular: false, link: "https://rzp.io/rzp/ezaWs4QV" },
     { followers: "3K", price: "399", original: "899", popular: false, link: "https://rzp.io/rzp/SQc2qZRQ" },
     { followers: "100K", price: "599", original: "1999", popular: true, link: "https://rzp.io/rzp/3FiO1l0j" },
@@ -475,70 +476,8 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-slate-900 border border-slate-800 rounded-3xl p-8 relative shadow-2xl shadow-pink-500/5 overflow-hidden text-center">
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600"></div>
           
-          <h2 className="text-2xl font-bold mb-4">Complete Payment</h2>
+          <h2 className="text-2xl font-bold mb-4">Order Summary</h2>
           
-          {["1K", "3K", "100K"].includes(plan.followers) ? (
-             <div className="bg-white p-6 rounded-2xl mb-8 mx-auto w-fit flex flex-col items-center">
-               <div className="flex gap-4 justify-center items-center w-full mb-4 px-2">
-                 <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI" className="h-5" />
-               </div>
-               <QRCode value={`upi://pay?pa=Myshopsmyhome@rzp&pn=Myshopsmyhome&am=${plan.price}&cu=INR`} size={180} />
-               <p className="text-slate-900 text-xs font-bold tracking-wider mt-4 text-center">SCAN & PAY WITH ANY UPI APP</p>
-               <div className="flex gap-3 justify-center mt-4 items-center grayscale">
-                 <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" alt="GPay" className="h-4" />
-                 <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-4" />
-                 <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_%28standalone%29.svg" alt="Paytm" className="h-[10px]" />
-               </div>
-               <div className="mt-6 text-center text-[#0b1b42] font-semibold text-2xl tracking-tight">Myshopsmyhome</div>
-               <div className="text-center text-[#0b1b42] font-medium text-lg mt-1">{plan.followers}</div>
-             </div>
-          ) : (
-             <div className="flex flex-col items-center mb-6">
-                <p className="text-slate-400 mb-4 text-sm leading-relaxed">Secure payment powered by Razorpay.</p>
-                <button 
-                  onClick={async () => {
-                     const res = await new Promise((resolve) => {
-                        const script = document.createElement("script");
-                        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-                        script.onload = () => resolve(true);
-                        script.onerror = () => resolve(false);
-                        document.body.appendChild(script);
-                     });
-                     if (!res) {
-                        alert("Failed to load Razorpay payment gateway.");
-                        return;
-                     }
-                     const options = {
-                        key: "rzp_live_SQyi6kKYHeopKY",
-                        amount: Math.round(parseFloat(plan.price) * 100),
-                        currency: "INR",
-                        name: "Myshopsmyhome",
-                        description: `Grow ${plan.followers} Followers`,
-                        handler: async function (response: any) {
-                           // Save to Firebase as a successful order
-                           await createSuccessfulOrder(username, plan, response.razorpay_payment_id);
-                           
-                           // Update the local input and status automatically
-                           setRrn(response.razorpay_payment_id);
-                           setStatus("success");
-                        },
-                        prefill: {
-                           name: username
-                        },
-                        theme: {
-                           color: "#ec4899"
-                        }
-                     };
-                     const rzp = new (window as any).Razorpay(options);
-                     rzp.open();
-                  }}
-                  className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
-                >
-                  Pay ₹{plan.price} Now
-                </button>
-             </div>
-          )}
-
           <div className="bg-slate-950/50 rounded-2xl p-5 mb-8 border border-slate-800/50 text-left">
             <div className="flex justify-between items-center mb-4">
               <span className="text-slate-400 font-medium">Package</span>
@@ -555,43 +494,50 @@ function CheckoutPage({ plan, username, onBack }: { plan: any, username: string,
             </div>
           </div>
 
-          {status === "verifying" ? (
-             <div className="py-4 flex flex-col items-center">
-                <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-slate-400 animate-pulse">Verifying payment mapping...</p>
-             </div>
-          ) : (
-            <div className="space-y-5 flex flex-col">
-              <div className="text-left w-full">
-                <label htmlFor="rrn" className="block text-sm font-medium text-slate-300 mb-1">Transaction ID / UTR / RRN <span className="text-pink-500">*</span></label>
-                <input 
-                  type="text" 
-                  id="rrn"
-                  value={rrn}
-                  onChange={(e) => { setRrn(e.target.value); setRrnError(false); }}
-                  placeholder="e.g. 123456789012" 
-                  className={`block w-full p-3 bg-slate-900/80 border ${rrnError ? 'border-red-500' : 'border-slate-700'} rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all`} 
-                />
-                {rrnError && <p className="text-red-400 text-xs mt-1">Please enter your transaction reference number to verify payment.</p>}
-              </div>
-              <button 
-                onClick={async () => {
-                  if (!rrn.trim()) {
-                    setRrnError(true);
+          <div className="flex flex-col items-center">
+            <p className="text-slate-400 mb-4 text-sm leading-relaxed">Secure payment powered by Razorpay.</p>
+            <button 
+              onClick={async () => {
+                 const res = await new Promise((resolve) => {
+                    const script = document.createElement("script");
+                    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+                    script.onload = () => resolve(true);
+                    script.onerror = () => resolve(false);
+                    document.body.appendChild(script);
+                 });
+                 if (!res) {
+                    alert("Failed to load Razorpay payment gateway.");
                     return;
-                  }
-                  setStatus("verifying");
-                  await createQRVerificationOrder(username, plan, rrn);
-                  setTimeout(() => setStatus("success"), 1000);
-                }} 
-                className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 transition-all flex items-center justify-center gap-2 mt-4"
-              >
-                <CheckCircle className="w-5 h-5" /> I Have Completed Payment
-              </button>
-              
-              {/* Fallback button removed since Razorpay popup natively loads now */}
-            </div>
-          )}
+                 }
+                 const options = {
+                    key: "rzp_live_SQyi6kKYHeopKY",
+                    amount: Math.round(parseFloat(plan.price) * 100),
+                    currency: "INR",
+                    name: "Myshopsmyhome",
+                    description: `Grow ${plan.followers} Followers`,
+                    handler: async function (response: any) {
+                       // Save to Firebase as a successful order
+                       await createSuccessfulOrder(username, plan, response.razorpay_payment_id);
+                       
+                       // Update the local input and status automatically
+                       setRrn(response.razorpay_payment_id);
+                       setStatus("success");
+                    },
+                    prefill: {
+                       name: username
+                    },
+                    theme: {
+                       color: "#ec4899"
+                    }
+                 };
+                 const rzp = new (window as any).Razorpay(options);
+                 rzp.open();
+              }}
+              className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
+            >
+              Pay ₹{plan.price} Now
+            </button>
+          </div>
         </motion.div>
       </div>
     </div>
